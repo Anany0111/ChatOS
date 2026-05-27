@@ -127,11 +127,17 @@ export default function App() {
     convHistory.current.push({ role: "user", content: userMessage });
 
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
+          contents: convHistory.current.slice(-10).map(m => ({
+            role: m.role === "assistant" ? "model" : "user",
+            parts: [{ text: m.content }]
+          })),
+          systemInstruction: { parts: [{ text: `You are ARIA, a witty and helpful AI assistant in a real-time group chat app. You speak concisely (1-3 sentences max), use occasional emojis naturally, and have a warm but sharp personality. The current channel is #${activeRoom}.` }] },
+          generationConfig: { maxOutputTokens: 1000 },
           max_tokens: 1000,
           system: `You are ARIA, a witty and helpful AI assistant in a real-time group chat app. You speak concisely (1-3 sentences max), use occasional emojis naturally, and have a warm but sharp personality. You're knowledgeable but never condescending. The current channel is #${activeRoom}.`,
           messages: convHistory.current.slice(-10),
@@ -139,7 +145,7 @@ export default function App() {
       });
 
       const data = await response.json();
-      const aiText = data.content?.map(b => b.text || "").join("") || "Sorry, something went wrong!";
+      const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, something went wrong!";
       convHistory.current.push({ role: "assistant", content: aiText });
 
       setAiTyping(false);
